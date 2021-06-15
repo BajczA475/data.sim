@@ -1,0 +1,17 @@
+Package: data.sim
+Title: Build Simulated Data Sets Fast
+Version: 0.0.0.9000
+Authors@R: 
+    person(given = "Alex",
+           family = "Bajcz",
+           role = c("aut", "cre"),
+           email = "Bajcz003@umn.edu",
+           comment = c(ORCID = "0000-0002-5909-4676"))
+Description: The idea of this package is to quickly and easily generate simulated data sets that can then be used for other end uses, such as feeding into simulations or serving as "training data sets" for Bayesian models or simulation models.
+License: use_gpl_license()
+Encoding: UTF-8
+LazyData: true
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.1.1
+Imports: SuppDists,
+         MASS
