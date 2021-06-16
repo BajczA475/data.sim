@@ -2,7 +2,7 @@
 % Please edit documentation in R/sim.obs.data.R
 \name{sim.obs.data}
 \alias{sim.obs.data}
-\title{Random linear model data generator}
+\title{Random linear model observed data generator}
 \usage{
 sim.obs.data(
   Xs,
@@ -78,11 +78,83 @@ A list containing two vectors, /code{exp.ys} and /code\link{obs.ys}, which corre
 Simulate random observed data based on input data and parameters.
 }
 \details{
-The sim.obs.data function generates observed and expected "generalized linear regression" response data utilizing independent variable data, parameter values, model structure, and assumptions you specify. It can handle most standard model families with their typical linking functions, any number of covariates (including factors with multiple levels that will need to be dummy coded), and random slopes and/or intercepts based on a single grouping variable. However, the mechanics of complex models will require inputs to be specified in a very specific manner.
+The sim.obs.data function generates observed and expected
+"generalized linear regression" response data utilizing independent
+variable data, parameter values, model structure, and assumptions you
+specify. It can handle most standard model families with their typical
+linking functions, any number of covariates (including factors with
+multiple levels that will need to be dummy coded), and random slopes and/or
+intercepts based on a single grouping variable. However, the mechanics of
+complex models will require inputs to be specified in a very specific
+manner.
 
-The function will assume there is a global intercept term in the model unless random effects have been specified (in which case the model will switch instead of mean encoding). The global intercept term could be countered by setting the first value in param.mat to 0, but keep in mind that that would effectively coerce the data to have a y intercept of 0, which rarely makes sense.
+The function will assume there is a global intercept term in the model
+unless random effects have been specified (in which case the model will
+switch instead of mean encoding). The global intercept term could be
+countered by setting the first value in param.mat to 0, but keep in mind
+that that would effectively coerce the data to have a y intercept of 0,
+which rarely makes sense.
 
-If there are polynomial, interaction, or other complex terms in your model, these should be precalculated and comprised within the input to Xs. In other words, if you are trying to fit ~X1 + X2 + X1:X2, there should be a column in your input to Xs that is already the product of X1 and X2, and there should also be a corresponding beta term in the param.mat input vector for this term.
+If there are polynomial, interaction, or other complex terms in your model,
+these should be precalculated and comprised within the input to Xs. In
+other words, if you are trying to fit ~X1 + X2 + X1:X2, there should be a
+column in your input to Xs that is already the product of X1 and X2, and
+there should also be a corresponding beta term in the param.mat input
+vector for this term.
+}
+\examples{
+##This example shows a workflow for generating an entire simulated 
+#data set (multiple X variables plus 1 Y variable) using sim.pred.data() plus 
+#sim.obs.data that shows the typical syntax for a call to sim.obs.data plus 
+#many of its features. It's a somewhat trivial case because it calls all 
+#seven available families (with their standard linking functions) once using 
+#the same input linear coefficient values even though the likely coefficient 
+#values will tend to be very different for, as an example, a gamma model 
+#versus a binomial one.
+
+#Generates a predictor data set with two Xs, one numeric and one factorial.
+Xstest = sim.data::sim.pred.data(col.num = 2, col.length = 25, 
+         FUNs = c("rnorm", "sample"), factor.YN = c(FALSE, TRUE),
+         x.sample = 0:2, replace = TRUE, sample.prob = c(0.4, 0.2, 0.4), 
+         mean = 2, sd = 0.5)
+print(Xstest) #shows what's we've made.
+
+# we'll simulate one Y variable for each model family implemented using its 
+#standard linking function.
+family.test = c("gaussian", "gamma", "inverse.gaussian", "poisson", 
+              "bernoulli", "binomial", "negative.binomial")
+link.test = link = c("identity", "inverse", "inverse.squared", "log", 
+            "logit", "logit", "log")
+
+#We'll randomly draw parameter values for the specialized families from 
+#plausible distributions.
+sigma.test = runif(1, min=0.5, max=5)
+lambda.test = runif(1, min=0.5, max=5)
+N.trials.test = round(rnorm(length(Xstest[,1]), 40, 10))
+scale.test = runif(1, min=0.5, max=5)
+size.test = runif(1, min=0.5, max=5)
+param.mat.test1 = c(0.1, 0.2, 2.5, -0.4) #The function will coerce this to a
+#matrix with 1 column for you.
+
+# we'll create empty matrices to store our output Y data.
+record.obs = matrix(data = NA, nrow=length(Xstest[,1]), ncol=length(family.test))
+record.exp = matrix(data = NA, nrow=length(Xstest[,1]), ncol=length(family.test))
+
+#For each family-link combo, we'll call sim.obs.data to generate a set of 
+#appropriate Y data. sim.obs.data will ignore inputs that are not essential 
+#for the family being called.
+for(trial in 1:length(family.test)) {
+  test1 = sim.obs.data(Xs = Xstest, param.mat = param.mat.test1, 
+          family = family.test[trial], link = link.test[trial], 
+          sigma = sigma.test, lambda = lambda.test, N.trials = N.trials.test,
+                      scale = scale.test, size = size.test, 
+                      random.intercepts = TRUE,group.intercepts = 2:4, 
+                      mu.intercepts = 1, sigma.intercepts = 0.5)
+ record.obs[,trial] = test1$obs.ys #record the observed data generated.
+ record.exp[,trial] = test1$exp.ys #record the "expected" data generated.
+}
+
+print(record.obs) ; print(record.exp) #Show what we've made. 
 }
 \author{
 Alex Bajcz

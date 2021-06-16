@@ -1,4 +1,4 @@
-#' @title Random linear model data generator
+#' @title Random linear model observed data generator
 #' @description Simulate random observed data based on input data and parameters.
 #' @author Alex Bajcz
 #'  
@@ -25,11 +25,83 @@
 #' @param sigma.slopes A single numerical value corresponding to the standard deviation of the hyperdistribution from which new random slope parameter values between Y and 1 continuous covariated specified will be chosen, one for each group in the grouping variable specified. Defaults to NULL but must be provided if random.slopes is TRUE.
 #' @return A list containing two vectors, /code{exp.ys} and /code[obs.ys], which correspond to the expected and observed Y values simulated by the function, given the inputs. 
 #' @export
-#' @details The sim.obs.data function generates observed and expected "generalized linear regression" response data utilizing independent variable data, parameter values, model structure, and assumptions you specify. It can handle most standard model families with their typical linking functions, any number of covariates (including factors with multiple levels that will need to be dummy coded), and random slopes and/or intercepts based on a single grouping variable. However, the mechanics of complex models will require inputs to be specified in a very specific manner. 
-#' 
-#' The function will assume there is a global intercept term in the model unless random effects have been specified (in which case the model will switch instead of mean encoding). The global intercept term could be countered by setting the first value in param.mat to 0, but keep in mind that that would effectively coerce the data to have a y intercept of 0, which rarely makes sense. 
-#' 
-#' If there are polynomial, interaction, or other complex terms in your model, these should be precalculated and comprised within the input to Xs. In other words, if you are trying to fit ~X1 + X2 + X1:X2, there should be a column in your input to Xs that is already the product of X1 and X2, and there should also be a corresponding beta term in the param.mat input vector for this term. 
+#' @details The sim.obs.data function generates observed and expected
+#'   "generalized linear regression" response data utilizing independent
+#'   variable data, parameter values, model structure, and assumptions you
+#'   specify. It can handle most standard model families with their typical
+#'   linking functions, any number of covariates (including factors with
+#'   multiple levels that will need to be dummy coded), and random slopes and/or
+#'   intercepts based on a single grouping variable. However, the mechanics of
+#'   complex models will require inputs to be specified in a very specific
+#'   manner.
+#'
+#'   The function will assume there is a global intercept term in the model
+#'   unless random effects have been specified (in which case the model will
+#'   switch instead of mean encoding). The global intercept term could be
+#'   countered by setting the first value in param.mat to 0, but keep in mind
+#'   that that would effectively coerce the data to have a y intercept of 0,
+#'   which rarely makes sense.
+#'
+#'   If there are polynomial, interaction, or other complex terms in your model,
+#'   these should be precalculated and comprised within the input to Xs. In
+#'   other words, if you are trying to fit ~X1 + X2 + X1:X2, there should be a
+#'   column in your input to Xs that is already the product of X1 and X2, and
+#'   there should also be a corresponding beta term in the param.mat input
+#'   vector for this term.
+#' @examples ##This example shows a workflow for generating an entire simulated 
+#' #data set (multiple X variables plus 1 Y variable) using sim.pred.data() plus 
+#' #sim.obs.data that shows the typical syntax for a call to sim.obs.data plus 
+#' #many of its features. It's a somewhat trivial case because it calls all 
+#' #seven available families (with their standard linking functions) once using 
+#' #the same input linear coefficient values even though the likely coefficient 
+#' #values will tend to be very different for, as an example, a gamma model 
+#' #versus a binomial one.
+#'
+#' #Generates a predictor data set with two Xs, one numeric and one factorial.
+#' Xstest = sim.data::sim.pred.data(col.num = 2, col.length = 25, 
+#'          FUNs = c("rnorm", "sample"), factor.YN = c(FALSE, TRUE),
+#'          x.sample = 0:2, replace = TRUE, sample.prob = c(0.4, 0.2, 0.4), 
+#'          mean = 2, sd = 0.5)
+#' print(Xstest) #shows what's we've made.
+#'
+#' # we'll simulate one Y variable for each model family implemented using its 
+#' #standard linking function.
+#' family.test = c("gaussian", "gamma", "inverse.gaussian", "poisson", 
+#'               "bernoulli", "binomial", "negative.binomial")
+#' link.test = link = c("identity", "inverse", "inverse.squared", "log", 
+#'             "logit", "logit", "log")
+#'
+#' #We'll randomly draw parameter values for the specialized families from 
+#' #plausible distributions.
+#' sigma.test = runif(1, min=0.5, max=5)
+#' lambda.test = runif(1, min=0.5, max=5)
+#' N.trials.test = round(rnorm(length(Xstest[,1]), 40, 10))
+#' scale.test = runif(1, min=0.5, max=5)
+#' size.test = runif(1, min=0.5, max=5)
+#' param.mat.test1 = c(0.1, 0.2, 2.5, -0.4) #The function will coerce this to a
+#' #matrix with 1 column for you.
+#'
+#' # we'll create empty matrices to store our output Y data.
+#' record.obs = matrix(data = NA, nrow=length(Xstest[,1]), ncol=length(family.test))
+#' record.exp = matrix(data = NA, nrow=length(Xstest[,1]), ncol=length(family.test))
+#'
+#' #For each family-link combo, we'll call sim.obs.data to generate a set of 
+#' #appropriate Y data. sim.obs.data will ignore inputs that are not essential 
+#' #for the family being called.
+#' for(trial in 1:length(family.test)) {
+#'   test1 = sim.obs.data(Xs = Xstest, param.mat = param.mat.test1, 
+#'           family = family.test[trial], link = link.test[trial], 
+#'           sigma = sigma.test, lambda = lambda.test, N.trials = N.trials.test,
+#'                       scale = scale.test, size = size.test, 
+#'                       random.intercepts = TRUE,group.intercepts = 2:4, 
+#'                       mu.intercepts = 1, sigma.intercepts = 0.5)
+#'  record.obs[,trial] = test1$obs.ys #record the observed data generated.
+#'  record.exp[,trial] = test1$exp.ys #record the "expected" data generated.
+#' }
+#'
+#' print(record.obs) ; print(record.exp) #Show what we've made. 
+
+
 
 sim.obs.data = function (Xs, param.mat, family = "gaussian", link = "identity", 
                          sigma = NULL, lambda = NULL, N.trials = NULL, scale = NULL, size = NULL,  
@@ -51,7 +123,7 @@ sim.obs.data = function (Xs, param.mat, family = "gaussian", link = "identity",
   if (lambda <= 0 ) { stop("A negative lambda was provided! Lambda must be >0.")}
   if (family == "binomial" & is.null(N.trials)) { stop("Family specified as binomial but no N.trials vector provided!")}
   if (length(N.trials) != nrow(Xs)) { stop("The length of N.trials does not equal the number of rows in Xs.")}
-  if (any(N.trials) <= 0 ) { stop("At least one value in N.trials <= 0, which isn't logical!")}
+  if (any(N.trials <= 0 )) { stop("At least one value in N.trials <= 0, which isn't logical!")}
   if (family == "gamma" & is.null(scale)) { stop("Family specified as gamma but no scale value provided!")}
   if (length(scale) > 1) { stop("More than 1 scale value was provided!")}
   if (scale <= 0 ) { stop("A negative scale was provided! Scale must be >0.")}
@@ -59,24 +131,23 @@ sim.obs.data = function (Xs, param.mat, family = "gaussian", link = "identity",
   if (length(size) > 1) { stop("More than 1 size value was provided!")}
   if (size <= 0 ) { stop("A negative size was provided! Size must be >0.")}
   if (random.slopes !=TRUE & random.slopes != FALSE) { stop("Invalid value provided for random.slopes!")}
-  if (random.slopes == TRUE & is.null(group.slopes)| is.null(mu.slopes)| is.null(sigma.slopes)) { stop("Ensure that group.slopes, mu.slopes, and sigma.slopes are specified if random.slopes is TRUE!")}
+  if (random.slopes == TRUE & (is.null(group.slopes) | is.null(mu.slopes)| is.null(sigma.slopes) | 
+      is.null(rand.nongroup.var) | is.null(rand.int.term))) { stop("Ensure that group.slopes, mu.slopes, rand.int.term, rand.nongroup.var, and sigma.slopes are specified if random.slopes is TRUE!")}
   if (random.intercepts !=TRUE & random.intercepts != FALSE) { stop("Invalid value provided for random.intercepts!")}
-  if (random.intercepts == TRUE & is.null(group.intercepts)| is.null(mu.intercepts)| is.null(sigma.intercepts)) { stop("Ensure that group.intercepts, mu.intercepts, and sigma.intercepts are specified if random.intercepts is TRUE!")}
+  if (random.intercepts == TRUE & is.null(group.intercepts) & (is.null(mu.intercepts)| is.null(sigma.intercepts))) { stop("Ensure that group.intercepts, mu.intercepts, and sigma.intercepts are specified if random.intercepts is TRUE!")}
   if (slope.int.covary !=TRUE & slope.int.covary!= FALSE) { stop("Invalid value provided for slope.int.covary!")}
-  if (slope.int.covary == TRUE & isFALSE(random.slopes)| isFALSE(random.intercepts)| is.null(var.covar.mat)) { stop("Ensure that random.intercepts and random.slopes are TRUE and that a value for var.covar.mat is provided if slope.int.covary is TRUE!")}
-  if (!is.character(rand.int.term)) { stop("rand.int.term must be a character!")}
-  if(is.null(rand.int.term) & random.slopes == TRUE) { stop("A value for rand.int.term must be specified if random.slopes is TRUE!")}
-  if (!is.null(var.covar.mat) & dim(var.covar.mat) != c(2,2)) { stop("var.covar.mat should be a 2x2 matrix!")}
+  if (slope.int.covary == TRUE & isFALSE(random.slopes) & (isFALSE(random.intercepts) | is.null(var.covar.mat))) { stop("Ensure that random.intercepts and random.slopes are TRUE and that a value for var.covar.mat is provided if slope.int.covary is TRUE!")}
+  if (!is.character(rand.int.term) & !is.null(rand.int.term)) { stop("rand.int.term must be a character!")}
+  if (!is.null(var.covar.mat) & length(var.covar.mat) != 4) { stop("var.covar.mat should be a 2x2 matrix!")}
   if (slope.int.covary == TRUE & is.null(var.covar.mat)) { stop("A value for var.covar.mat should be specified if slope.int.covary is true!")}
-  if (diag(var.covar.mat) != c(1,1) | any(var.covar.mat) < 0 | any(var.covar.mat) > 1) { stop ("All values in var.covar.mat should be strictly between 0 and 1 and the values on the diagonal should be equal to 1!")}
-  if (!is.character(rand.nongroup.var) | length(rand.nongroup.var) != 1) { stop("Invalid value provided for rand.nongroup.var! It should be a character and of length 1!") }
-  if(random.slopes == TRUE & is.null(rand.nongroup.var)) { stop("A valuye for rand.nongroup.var must be specified if random.slopes is TRUE!")}
+  if (!is.null(var.covar.mat) && (diag(var.covar.mat) != c(1,1) | any(var.covar.mat < 0) | any(var.covar.mat > 1))) { stop ("All values in var.covar.mat should be strictly between 0 and 1 and the values on the diagonal should be equal to 1!")}
+  if (!is.null(rand.nongroup.var) && !is.character(rand.nongroup.var)) { stop("Invalid value provided for rand.nongroup.var! It should be a character and of length 1!") }
+  if (!is.null(rand.nongroup.var) & (length(rand.nongroup.var) != 1)) { stop("Invalid value provided for rand.nongroup.var! It should be a character and of length 1!") }
   if (length(group.intercepts) > length(param.mat)) { stop("The length of group.intercepts should not exceed that of param.mat!")}
   if (random.intercepts == TRUE & is.null(group.intercepts)) { stop("A value for group.intercepts must be provided if random.intercepts is TRUE!")}
-  if (slope.int.covary == TRUE & is.null(group.intercepts) | is.null(group.slopes)) { stop("If slope.int.covary is true, values for group.intercepts and group.slopes must both be provided!")}
+  if (slope.int.covary == TRUE & (is.null(group.intercepts) | is.null(group.slopes))) { stop("If slope.int.covary is true, values for group.intercepts and group.slopes must both be provided!")}
   if (slope.int.covary == TRUE & length(c(group.intercepts, group.slopes)) > length(param.mat)) { stop("Too many combined parameters provided to group.slopes and group.intercepts! The length should not exceed that of param.mat.")}
   if (length(group.slopes) > length(param.mat)) { stop("The length of group.slopes should not exceed that of param.mat!")}
-  if (random.slopes == TRUE & is.null(group.slopes)) { stop("A value for group.slopes must be provided if random.slopes is TRUE!")}
 
   #The first step is to "decompose" the columns provided as inputs to Xs so that we can assemble them into a predictable formula. However, we need to make sure we preserve the factor nature of any factor variables.
     for (col in 1:dim(Xs)[2]) { #For each column in Xs...
@@ -105,7 +176,7 @@ sim.obs.data = function (Xs, param.mat, family = "gaussian", link = "identity",
 
   #With the proper input assembled, we can construct our design matrix.
   design.mat = model.matrix(as.formula(formula1))
-  
+
   #Since it is very easy to miscount the number of parameters that will result from a model with many factor variables and/or random effects, we now check to make sure the model is specified correctly and abort if not. 
   if(dim(design.mat)[2] != dim(param.mat)[1]) { stop("Model misspecified! The number of columns in the design matrix does not correspond to the number of values in param.mat.")}
   
@@ -121,7 +192,7 @@ sim.obs.data = function (Xs, param.mat, family = "gaussian", link = "identity",
     param.mat[c(group.slopes, group.intercepts), 1] = MASS::mvrnorm(length(c(group.slopes, group.intercepts)), c(mu.intercepts, mu.slopes), var.covar.mat)
   }
   
-  #Step 4 is to create our linear predictor by matrix muliplying our design matrix by our parameter matrix.
+  #Step 4 is to create our linear predictor by matrix multiplying our design matrix by our parameter matrix.
   linear.predict = design.mat %*% param.mat
   
   #Step 5 is to generate a set of expected Y values based on the linear predictor we just calculated and linking function provided as input. I am *pretty sure* I have programmed these correctly but this should be checked. 
@@ -134,7 +205,7 @@ sim.obs.data = function (Xs, param.mat, family = "gaussian", link = "identity",
   if (link == "inverse.squared") {
     exp.ys = (1/sqrt(linear.predict))
   }
-  if (link == "logit") {
+  if (link == "logit") { #Not really expected Ys but rather estimates of the probability of successes in each trial.
     exp.ys = (exp(linear.predict)/(1 + (exp(linear.predict))))
   }
   if (link == "sqrt") {
@@ -143,7 +214,7 @@ sim.obs.data = function (Xs, param.mat, family = "gaussian", link = "identity",
   if (link == "inverse") {
     exp.ys = (linear.predict)^-1
   }
-  if (link == "cloglog") {
+  if (link == "cloglog") { #Not really expected Ys but rather estimates of the probability of successes in each trial.
     exp.ys = -exp(-exp((linear.predict))-1)
   }
   
@@ -168,7 +239,7 @@ sim.obs.data = function (Xs, param.mat, family = "gaussian", link = "identity",
   }
   if(family == "bernoulli" | family == "binomial") { #If the family is binomial or bernoulli, to draw new values, we have to provide the number of trials involved in each event. This is 1 for every event in the case of bernoulli (every even is a single "coin-flip").
       if (family == "bernoulli" ) { 
-        usethisN = rep(1, lengthth(exp.ys)) } else {
+        usethisN = 1 } else {
           usethisN = N.trials }
           obs.ys = rbinom(N, size=usethisN, prob=exp.ys) #N.trials must be provided if family is binomial.
   }
